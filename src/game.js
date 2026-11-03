@@ -1,13 +1,18 @@
+Attempting to perform the InitializeDefaultDrives operation on the 'FileSystem' provider failed.
 import {Player} from './player.js';
 import {generateFloor} from './floors.js';
 import {drawGame} from './rendering.js';
 import {updateProjectiles,hitTestProjectiles,hitTestEnemyShots} from './combat.js';
 import {loadSave,recordFloor} from './save.js';
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
-const save=loadSave();const state={time:0,keys:new Set(),touch:{x:0,y:0,active:false},shots:[],enemyShots:[],booms:[],floor:generateFloor(1),roomIndex:0,message:'',messageTimer:2,mapRevealed:false,lastBomb:false,roomRewardTaken:false,visited:new Set([0]),save};state.player=new Player();
+const save=loadSave();const state={time:0,keys:new Set(),touch:{move:null,aim:null},shots:[],enemyShots:[],booms:[],floor:generateFloor(1),roomIndex:0,message:'',messageTimer:2,mapRevealed:false,lastBomb:false,roomRewardTaken:false,visited:new Set([0]),save};state.player=new Player();
 function resize(){canvas.width=innerWidth*devicePixelRatio;canvas.height=innerHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}addEventListener('resize',resize);resize();
 addEventListener('keydown',e=>state.keys.add(e.key.toLowerCase()));addEventListener('keyup',e=>state.keys.delete(e.key.toLowerCase()));
-canvas.addEventListener('pointerdown',e=>state.touch={x:e.clientX,y:e.clientY,active:true});canvas.addEventListener('pointermove',e=>{if(state.touch.active)state.touch={x:e.clientX,y:e.clientY,active:true}});addEventListener('pointerup',()=>state.touch.active=false);
+const pointers=new Map();
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();canvas.setPointerCapture(e.pointerId);const side=e.pointerType==='mouse'||e.clientX>=innerWidth/2?'aim':'move';const stick={id:e.pointerId,originX:side==='aim'&&e.pointerType==='mouse'?innerWidth/2:e.clientX,originY:side==='aim'&&e.pointerType==='mouse'?innerHeight/2:e.clientY,x:e.clientX,y:e.clientY};pointers.set(e.pointerId,side);state.touch[side]=stick});
+canvas.addEventListener('pointermove',e=>{const side=pointers.get(e.pointerId);if(side&&state.touch[side]?.id===e.pointerId){state.touch[side]={...state.touch[side],x:e.clientX,y:e.clientY}}});
+function endPointer(e){const side=pointers.get(e.pointerId);if(side&&state.touch[side]?.id===e.pointerId)state.touch[side]=null;pointers.delete(e.pointerId)}
+canvas.addEventListener('pointerup',endPointer);canvas.addEventListener('pointercancel',endPointer);canvas.addEventListener('lostpointercapture',endPointer);
 function current(){return state.floor.rooms[state.roomIndex]}
 function show(msg){state.message=msg;state.messageTimer=2}
 function enterRoom(index,dir){state.roomIndex=index;state.visited.add(index);state.player.x=dir==='E'?-285:dir==='W'?285:0;state.player.y=dir==='N'?175:dir==='S'?-175:0;state.shots=[];state.enemyShots=[];state.booms=[];state.roomRewardTaken=false;show(`Entered ${current().kind.replace('-',' ')} room`)}
@@ -16,3 +21,4 @@ function handleRoomState(){const r=current();if(!r.cleared&&(r.enemies||[]).ever
 function handleReward(){const r=current();if(r.kind==='shop'){for(const slot of r.shopInventory||[]){if(!slot.bought&&Math.hypot(state.player.x,state.player.y)<80&&state.player.coins>=slot.cost){state.player.coins-=slot.cost;state.player.collect(slot.item,state);slot.bought=true;show(`Bought ${slot.item.name}`);break}}return}if(r.cleared&&!state.roomRewardTaken&&r.reward&&Math.hypot(state.player.x,state.player.y)<65){state.player.collect(r.reward,state);state.roomRewardTaken=true;show(`Picked up ${r.reward.name}`)}}
 function update(dt){state.time+=dt;state.messageTimer=Math.max(0,state.messageTimer-dt);const r=current();state.player.update(dt,state);for(const e of r.enemies||[])e.update(dt,state.player,state);updateProjectiles(state.shots,dt);updateProjectiles(state.enemyShots,dt);hitTestProjectiles(state.shots,r.enemies||[],state.player,state);hitTestEnemyShots(state.enemyShots,state.player);for(let i=state.enemyShots.length-1;i>=0;i--)if(state.enemyShots[i].life<=0)state.enemyShots.splice(i,1);for(let i=state.shots.length-1;i>=0;i--)if(state.shots[i].life<=0)state.shots.splice(i,1);for(const b of state.booms)b.t-=dt;state.booms=state.booms.filter(b=>b.t>0);handleRoomState();handleReward();tryDoor();if(state.player.hp<=0){show('You fell... restarting floor');state.floor=generateFloor(state.floor.depth);state.roomIndex=0;state.visited=new Set([0]);state.player.reset()}}
 function loop(t){const dt=Math.min(.033,(t-(state.last||t))/1000);state.last=t;update(dt);drawGame(ctx,state);requestAnimationFrame(loop)}requestAnimationFrame(loop);
+
