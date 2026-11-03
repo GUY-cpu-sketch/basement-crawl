@@ -1,0 +1,22 @@
+name: iOS Prepare
+on:
+  workflow_dispatch:
+  push:
+    paths: ['src/**','index.html','package.json','capacitor.config.ts']
+jobs:
+  prepare:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npx cap add ios
+      - run: npx cap sync ios
+      - name: Upload generated iOS project
+        uses: actions/upload-artifact@v4
+        with:
+          name: basement-crawl-ios-project
+          path: ios/
