@@ -1,4 +1,4 @@
-export function fireProjectile(a,p){return{x:p.x,y:p.y,vx:Math.cos(a)*460,vy:Math.sin(a)*460,damage:p.getDamage(),life:1.25,pierce:p.pierce,owner:'player',hit:new Set()}}
+export function fireProjectile(a,p,momentum){const mx=momentum?.x||0,my=momentum?.y||0;return{x:p.x,y:p.y,vx:Math.cos(a)*460+mx,vy:Math.sin(a)*460+my,damage:p.getDamage(),life:1.25,pierce:p.pierce,owner:'player',hit:new Set()}}
 export function updateProjectiles(list,dt){for(const q of list){q.x+=q.vx*dt;q.y+=q.vy*dt;q.life-=dt}}
 export function hitTestProjectiles(shots,enemies,player,state){for(const q of shots){if(q.life<=0)continue;for(const e of enemies){if(!e.alive||q.hit.has(e))continue;if(Math.hypot(q.x-e.x,q.y-e.y)<e.radius+6){q.hit.add(e);e.hp-=q.damage;if(e.hp<=0){e.alive=false;state.onEnemyKilled?.(e)}if(q.pierce>0){q.pierce--;continue}q.life=0;break}}}}
 export function hitTestEnemyShots(shots,p){for(const q of shots){if(q.life<=0)continue;if(Math.hypot(q.x-p.x,q.y-p.y)<18){p.takeDamage(q.damage);q.life=0}}}
