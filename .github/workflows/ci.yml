@@ -3,14 +3,18 @@ on:
   push:
   pull_request:
 jobs:
-  syntax:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install dependencies
+        run: npm install
       - name: Check JavaScript syntax
-        run: for f in src/*.js; do node --check "$f"; done
+        run: npm run check
+      - name: Room-generation smoke test
+        run: npm test
       - name: Check entry point
         run: test -f index.html
