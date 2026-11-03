@@ -11,4 +11,4 @@ Architecture: src/game.js game loop; src/input.js device-aware control schemes; 
 All game content is original and intended as an independent project, not a copy of another game's assets or code.
 
 
-GUY-cpu-sketch.github.io
+~GUY-cpu-sketch.github.io/basement-crawl
