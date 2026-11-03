@@ -1,12 +1,17 @@
-import { Player } from './player.js';
-import { generateFloor } from './floors.js';
-import { drawGame } from './rendering.js';
-import { updateProjectiles, hitTestProjectiles } from './combat.js';
+import {Player} from './player.js';
+import {generateFloor} from './floors.js';
+import {drawGame} from './rendering.js';
+import {updateProjectiles,hitTestProjectiles,hitTestEnemyShots} from './combat.js';
+import {loadSave,recordFloor} from './save.js';
 const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
-const state={time:0,keys:new Set(),touch:{x:0,y:0,active:false},shots:[],floor:generateFloor(1),roomIndex:0};
-const player=new Player();state.player=player;
+const save=loadSave();const state={time:0,keys:new Set(),touch:{x:0,y:0,active:false},shots:[],enemyShots:[],booms:[],floor:generateFloor(1),roomIndex:0,message:'',messageTimer:2,mapRevealed:false,lastBomb:false,roomRewardTaken:false,save};state.player=new Player();
 function resize(){canvas.width=innerWidth*devicePixelRatio;canvas.height=innerHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0)}addEventListener('resize',resize);resize();
 addEventListener('keydown',e=>state.keys.add(e.key.toLowerCase()));addEventListener('keyup',e=>state.keys.delete(e.key.toLowerCase()));
-canvas.addEventListener('pointerdown',e=>state.touch={x:e.clientX,y:e.clientY,active:true});canvas.addEventListener('pointermove',e=>{if(state.touch.active)state.touch={x:e.clientX,y:e.clientY,active:true}});canvas.addEventListener('pointerup',()=>state.touch.active=false);
-function update(dt){state.time+=dt;player.update(dt,state);const room=state.floor.rooms[state.roomIndex];for(const e of room.enemies)e.update(dt,player);updateProjectiles(state.shots,dt);hitTestProjectiles(state.shots,room.enemies);if(player.hp<=0){state.floor=generateFloor(1);state.roomIndex=0;player.reset()}}
+canvas.addEventListener('pointerdown',e=>state.touch={x:e.clientX,y:e.clientY,active:true});canvas.addEventListener('pointermove',e=>{if(state.touch.active)state.touch={x:e.clientX,y:e.clientY,active:true}});addEventListener('pointerup',()=>state.touch.active=false);
+function current(){return state.floor.rooms[state.roomIndex]}
+function show(msg){state.message=msg;state.messageTimer=2}
+function enterRoom(index,dir){state.roomIndex=index;state.player.x=dir==='E'?-285:dir==='W'?285:0;state.player.y=dir==='N'?175:dir==='S'?-175:0;state.shots=[];state.enemyShots=[];state.booms=[];state.roomRewardTaken=false;show(`Entered ${current().kind.replace('-',' ')} room`)}
+function tryDoor(){const r=current();if(!r.cleared)return;const edge=Math.abs(state.player.x)>307?Math.sign(state.player.x):0;const vertical=Math.abs(state.player.y)>202?Math.sign(state.player.y):0;if(edge){const d=edge>0?'E':'W';const target=r.connections[d];if(target!==undefined)enterRoom(target,d)}else if(vertical){const d=vertical>0?'S':'N';const target=r.connections[d];if(target!==undefined)enterRoom(target,d)}}
+function handleReward(){const r=current();if(r.cleared&&!state.roomRewardTaken&&r.reward&&Math.hypot(state.player.x,state.player.y)<65){state.player.collect(r.reward,state);state.roomRewardTaken=true;show(`Picked up ${r.reward.name}`);}}
+function update(dt){state.time+=dt;state.messageTimer=Math.max(0,state.messageTimer-dt);const r=current();state.player.update(dt,state);for(const e of r.enemies||[])e.update(dt,state.player,state);updateProjectiles(state.shots,dt);updateProjectiles(state.enemyShots,dt);hitTestProjectiles(state.shots,r.enemies||[],state.player,state);hitTestEnemyShots(state.enemyShots,state.player);for(let i=state.enemyShots.length-1;i>=0;i--)if(state.enemyShots[i].life<=0)state.enemyShots.splice(i,1);for(let i=state.shots.length-1;i>=0;i--)if(state.shots[i].life<=0)state.shots.splice(i,1);for(const b of state.booms)b.t-=dt;state.booms=state.booms.filter(b=>b.t>0);if((r.enemies||[]).every(e=>!e.alive)&&!r.cleared){r.cleared=true;for(const d of Object.keys(r.doors))r.doors[d].locked=false;show(r.kind==='boss'?'Boss defeated!':'Room cleared!');if(r.kind==='boss'){recordFloor(save,state.floor.depth);setTimeout(()=>{state.floor=generateFloor(state.floor.depth+1);state.roomIndex=0;state.player.x=0;state.player.y=0;show(`Floor ${state.floor.depth}`)},700)}}handleReward();tryDoor();if(state.player.hp<=0){show('You fell... restarting floor');state.floor=generateFloor(state.floor.depth);state.roomIndex=0;state.player.reset()}}
 function loop(t){const dt=Math.min(.033,(t-(state.last||t))/1000);state.last=t;update(dt);drawGame(ctx,state);requestAnimationFrame(loop)}requestAnimationFrame(loop);
