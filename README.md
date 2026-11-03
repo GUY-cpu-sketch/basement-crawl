@@ -9,4 +9,4 @@ Architecture: src/game.js game loop; src/player.js player; src/enemies.js AI; sr
 All game content is original and intended as an independent project, not a copy of another game's assets or code.
 
 
-cpu-guy-sketch.github.io
+GUY-cpu-sketch.github.io
